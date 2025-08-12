@@ -25,19 +25,19 @@
 
 ---
 
-### 🔄 Commit 2: 基础工具调用机制
-**状态**: 待开始 🔄  
+### ✅ Commit 2: 基础工具调用机制
+**状态**: 已完成 ✅  
 **预计时间**: 2-3天
 
 **实现目标**:
-- [ ] 创建actions目录和结构
-- [ ] 实现CodeRunningAction类
-- [ ] 集成EvoAgentX的PythonInterpreterToolkit
-- [ ] 为ManagerAgent添加工具调用能力
-- [ ] 实现基础的代码执行功能
-- [ ] 错误处理和安全执行
-- [ ] 更新测试用例
-- [ ] 创建代码执行示例
+- [x] 创建actions目录和结构
+- [x] 实现CodeRunningAction类
+- [x] 集成EvoAgentX的PythonInterpreterToolkit
+- [x] 为ManagerAgent添加工具调用能力
+- [x] 实现基础的代码执行功能
+- [x] 错误处理和安全执行
+- [x] 更新测试用例
+- [x] 创建代码执行示例
 
 **核心文件**:
 - `actions/code_running.py`: CodeRunningAction实现
@@ -70,24 +70,30 @@
 
 ---
 
-### 🔄 Commit 4: Web搜索集成
+### 🔄 Commit 4: Web搜索工具集成 (架构简化版)
 **状态**: 待开始 🔄  
-**预计时间**: 2-3天
+**预计时间**: 1-2天 (专家建议优化后)
 
-**实现目标**:
-- [ ] 创建WebAgent类
-- [ ] 集成GoogleFreeSearchToolkit
-- [ ] 实现WebSearchAction
-- [ ] ManagerAgent与WebAgent的协作机制
-- [ ] 基础信息检索和过滤
+**实现目标** (基于专家建议优化):
+- [ ] 集成GoogleFreeSearchToolkit到ManagerAgent
+- [ ] 实现WebSearchAction作为工具
+- [ ] 为ManagerAgent添加ToolAdapter接口
+- [ ] 基础信息检索和过滤逻辑
 - [ ] 搜索结果质量评估
+- [ ] 预留未来多智能体拆分的接口钩子
 
 **核心文件**:
-- `agents/web_agent.py`: Web搜索智能体
 - `actions/web_search.py`: Web搜索Action
+- `agents/manager_agent.py`: 增强工具适配能力
+- `utils/tool_adapter.py`: 工具适配器接口
 - `examples/web_search_demo.py`: Web搜索演示
 
-**验收标准**: 能搜索和获取网络信息，支持多智能体协作
+**架构变更说明**:
+- **移除**: 独立WebAgent创建（推迟到Phase 3）
+- **简化**: WebSearch作为ManagerAgent的工具而非独立Agent
+- **优势**: 降低早期协作复杂度，聚焦核心功能
+
+**验收标准**: ManagerAgent能通过工具进行Web搜索并获取信息
 
 ---
 
@@ -113,43 +119,58 @@
 
 ---
 
-### 🔄 Commit 6: 脚本验证和执行
+### 🔄 Commit 6: Docker安全执行环境 (专家建议提前集成)
 **状态**: 待开始 🔄  
 **预计时间**: 2-3天
 
-**实现目标**:
-- [ ] 脚本安全性验证
-- [ ] 在隔离环境中执行脚本
+**实现目标** (基于专家建议优化):
+- [ ] 集成EvoAgentX的DockerInterpreterToolkit
+- [ ] 实现DockerExecutionAction
+- [ ] 脚本安全性验证和预处理
+- [ ] Docker容器资源限制配置
 - [ ] 执行结果验证和评估
 - [ ] 基础的错误恢复机制
 - [ ] 执行日志和监控
 
 **核心文件**:
-- `actions/script_validation.py`: 脚本验证Action
-- `utils/execution_sandbox.py`: 安全执行环境
+- `actions/docker_execution.py`: Docker执行Action
+- `utils/docker_config.py`: Docker配置管理
 - `utils/result_validator.py`: 结果验证器
+- `utils/security_validator.py`: 代码安全验证
 
-**验收标准**: 生成的脚本能安全执行并验证结果
+**架构变更说明**:
+- **提前集成**: 直接使用DockerInterpreterToolkit替代自建sandbox
+- **移除**: 自建execution_sandbox.py（避免后期重构）
+- **增强**: 从源头解决安全执行问题
+
+**验收标准**: 生成的脚本能在Docker环境中安全执行并验证结果
 
 ---
 
-### 🔄 Commit 7: 简化版MCP存储
+### 🔄 Commit 7: 基于框架的MCP存储系统 (专家建议优化)
 **状态**: 待开始 🔄  
-**预计时间**: 3天
+**预计时间**: 2-3天
 
-**实现目标**:
-- [ ] 创建MCPBox存储系统
+**实现目标** (基于专家建议优化):
+- [ ] 基于EvoAgentX的StorageHandler实现MCPBox
 - [ ] 工具注册和检索机制
-- [ ] 基于文件系统的持久化
-- [ ] 工具版本管理
-- [ ] 工具使用统计
+- [ ] 支持多后端存储 (SQLite/MongoDB)
+- [ ] 工具版本管理和依赖追踪
+- [ ] 工具使用统计和性能监控
+- [ ] 抽象存储接口设计
 
 **核心文件**:
-- `storage/mcp_box.py`: MCP存储管理
+- `storage/mcp_box.py`: MCP存储管理 (基于StorageHandler)
 - `storage/tool_registry.py`: 工具注册表
+- `storage/handlers/abstract.py`: 存储抽象接口
 - `utils/tool_metadata.py`: 工具元数据管理
 
-**验收标准**: 成功的工具能被保存和重复使用
+**架构变更说明**:
+- **框架集成**: 基于EvoAgentX StorageHandler而非文件系统
+- **可扩展性**: 支持SQLite、MongoDB等多种后端
+- **接口抽象**: 为未来扩展和迁移预留接口
+
+**验收标准**: 成功的工具能被持久化存储和高效检索
 
 ---
 
@@ -174,22 +195,30 @@
 
 ---
 
-### 🔄 Commit 9: 智能体协作机制
+### 🔄 Commit 9: 多智能体协作机制 (现在引入WebAgent)
 **状态**: 待开始 🔄  
-**预计时间**: 3天
+**预计时间**: 3-4天
 
-**实现目标**:
-- [ ] Manager和WebAgent协作协议
-- [ ] 消息传递和状态同步
-- [ ] 基础错误恢复机制
+**实现目标** (基于专家建议调整时机):
+- [ ] 创建独立WebAgent类 (从ManagerAgent分离)
+- [ ] Manager和WebAgent协作协议设计
+- [ ] 消息传递和状态同步机制
 - [ ] 智能体工作负载均衡
-- [ ] 协作结果聚合
+- [ ] 基础错误恢复和超时处理
+- [ ] 协作结果聚合和质量控制
 
 **核心文件**:
+- `agents/web_agent.py`: 独立Web搜索智能体
 - `coordination/agent_coordinator.py`: 智能体协调器
 - `communication/message_bus.py`: 消息总线
+- `utils/collaboration_protocol.py`: 协作协议
 
-**验收标准**: 多智能体能协作完成复杂任务
+**架构变更说明**:
+- **现在引入**: 基础功能稳定后，引入多智能体架构
+- **重构**: 将WebSearchAction从ManagerAgent迁移到独立WebAgent
+- **协作**: 实现真正的多智能体协作机制
+
+**验收标准**: ManagerAgent和WebAgent能协作完成复杂任务
 
 ---
 
@@ -299,23 +328,35 @@
 
 ---
 
-## 执行策略
+## 执行策略 (基于专家建议优化)
 
 ### 每个Commit标准流程:
 1. **需求分析**: 明确commit目标和范围
-2. **设计方案**: 设计实现方案和接口
-3. **编码实现**: 实现核心功能代码
-4. **测试验证**: 编写测试并验证功能
+2. **设计方案**: 设计实现方案和接口 (重点关注框架集成)
+3. **编码实现**: 实现核心功能代码 (优先使用EvoAgentX组件)
+4. **测试验证**: 编写测试并验证功能 (包含契约测试)
 5. **文档更新**: 更新相关文档注释
 6. **Code Review**: 代码审查质量检查
 7. **集成测试**: 确保与现有功能兼容
 8. **Commit提交**: 提交代码更新版本
 
-### 风险控制:
+### 风险控制措施 (专家建议):
+#### 基础风险控制
 - 每个commit独立可运行
-- 严格测试覆盖要求
+- 严格测试覆盖要求 (包含契约测试)
 - 定期架构review重构
 - 及时问题发现解决
+
+#### 技术风险缓解
+- **安全执行风险**: Docker容器 + 资源限制 + 超时控制
+- **成本控制风险**: RateLimiter + LLM调用缓存 + 成本监控
+- **质量稳定性风险**: 版本控制 + 回归测试 + API备用方案
+- **并发协作风险**: 硬性迭代上限 + 死锁检测
+
+#### 技术债务预防
+- **接口抽象**: 所有核心组件提供抽象接口
+- **中心化管理**: prompt模板、配置、日志统一管理
+- **可观测性**: 结构化日志 + 性能指标 + 调试trace
 
 ### 时间估算:
 - **总计**: 约3-4个月
@@ -342,6 +383,7 @@
 
 ---
 
-**最后更新**: 当前时间  
-**当前状态**: Commit 1 ✅ 完成，准备Commit 2  
-**下一个目标**: 基础工具调用机制
+**最后更新**: 2025-08-12 (专家咨询优化版)  
+**当前状态**: Commit 1 ✅ 完成，专家咨询优化完成，准备Commit 2  
+**下一个目标**: 基础工具调用机制  
+**架构优化**: 已采纳Gemini Pro和OpenAI o3专家建议进行架构简化和风险控制优化

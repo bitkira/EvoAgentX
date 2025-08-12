@@ -14,6 +14,7 @@ from typing import Dict, Any, Optional, List
 from evoagentx.agents import CustomizeAgent
 from evoagentx.models import OpenAILLMConfig
 from evoagentx.core.message import Message
+from ..actions.code_running import CodeRunningAction
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -75,7 +76,11 @@ Please analyze this task and provide your response:"""
         self.current_task: Optional[str] = None
         self.iteration_count: int = 0
         
+        # Initialize code running action for tool capabilities
+        self.code_runner = CodeRunningAction()
+        
         logger.info(f"Manager Agent '{name}' initialized successfully")
+        logger.info("Code execution capabilities enabled")
     
     def process_task(self, task: str, context: Optional[Dict[str, Any]] = None) -> str:
         """
@@ -132,7 +137,9 @@ Please analyze this task and provide your response:"""
             "basic_reasoning": "Apply logical reasoning to problems", 
             "response_generation": "Generate clear and helpful responses",
             "task_history": "Track and learn from previous tasks",
-            "capability_assessment": "Assess whether additional tools are needed"
+            "capability_assessment": "Assess whether additional tools are needed",
+            "code_execution": "Execute Python code safely in controlled environment",
+            "script_execution": "Run Python script files with security restrictions"
         }
     
     def get_task_history(self) -> List[Dict[str, Any]]:
@@ -181,3 +188,111 @@ Please analyze this task and provide your response:"""
             assessment["suggested_tools"].append("file_operations")
             
         return assessment
+    
+    def execute_code(self, code: str, language: str = "python") -> Dict[str, Any]:
+        """
+        Execute Python code using the integrated code runner.
+        
+        Args:
+            code: Python code to execute
+            language: Programming language (default: "python")
+            
+        Returns:
+            Dict containing execution result and metadata
+        """
+        logger.info("Executing code via Manager Agent")
+        
+        try:
+            result = self.code_runner.execute_code(code, language)
+            
+            # Log the execution result
+            if result["success"]:
+                logger.info("Code executed successfully")
+            else:
+                logger.warning(f"Code execution failed: {result['error']}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in code execution: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "result": None,
+                "output": None,
+                "error": error_msg,
+                "code": code
+            }
+    
+    def execute_script(self, file_path: str, language: str = "python") -> Dict[str, Any]:
+        """
+        Execute Python script file using the integrated code runner.
+        
+        Args:
+            file_path: Path to Python script file
+            language: Programming language (default: "python")
+            
+        Returns:
+            Dict containing execution result and metadata
+        """
+        logger.info(f"Executing script via Manager Agent: {file_path}")
+        
+        try:
+            result = self.code_runner.execute_script(file_path, language)
+            
+            # Log the execution result
+            if result["success"]:
+                logger.info(f"Script {file_path} executed successfully")
+            else:
+                logger.warning(f"Script execution failed: {result['error']}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in script execution: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "result": None,
+                "output": None,
+                "error": error_msg,
+                "file_path": file_path
+            }
+    
+    def validate_code(self, code: str) -> Dict[str, Any]:
+        """
+        Validate Python code for safety before execution.
+        
+        Args:
+            code: Python code to validate
+            
+        Returns:
+            Dict containing validation results
+        """
+        logger.debug("Validating code via Manager Agent")
+        
+        try:
+            result = self.code_runner.validate_code_safety(code)
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in code validation: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "is_safe": False,
+                "violations": [error_msg],
+                "code": code
+            }
+    
+    def get_code_runner_status(self) -> Dict[str, Any]:
+        """
+        Get status and configuration of the code runner.
+        
+        Returns:
+            Dict containing code runner status
+        """
+        try:
+            return self.code_runner.get_interpreter_status()
+        except Exception as e:
+            logger.error(f"Error getting code runner status: {str(e)}")
+            return {"error": str(e)}

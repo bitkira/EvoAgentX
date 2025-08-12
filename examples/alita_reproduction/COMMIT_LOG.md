@@ -87,3 +87,84 @@ examples/alita_reproduction/
 - Unit test coverage for core functionality
 
 This commit establishes a solid foundation for the ALITA reproduction project. The Manager Agent is functional at a basic level and ready for incremental enhancement in subsequent commits.
+
+---
+
+## Commit 2: Basic Tool Calling Mechanism ✅
+
+**Date**: Current  
+**Status**: ✅ Completed  
+**Branch**: main
+
+### What was implemented:
+1. **Code Execution Infrastructure**:
+   - Created `actions/` directory with proper module structure
+   - Implemented `CodeRunningAction` class with full EvoAgentX integration
+   - Integrated PythonInterpreterToolkit with security controls
+   - Added comprehensive error handling and validation
+
+2. **Manager Agent Enhancement**:
+   - Added code execution capabilities to ManagerAgent
+   - Integrated CodeRunningAction into agent workflow
+   - Enhanced capabilities reporting to include code execution
+   - Added methods for code execution, validation, and status reporting
+
+3. **Safety and Security**:
+   - Implemented code validation before execution
+   - Configured allowed imports for security
+   - Added project path and directory name restrictions
+   - Comprehensive error handling for runtime and syntax errors
+
+4. **Testing Infrastructure**:
+   - Created dedicated `test_code_running.py` with comprehensive test coverage
+   - Updated existing manager agent tests to include code execution capabilities
+   - Added tests for error handling, validation, and safety features
+   - Created test scenarios for mathematical calculations and data processing
+
+5. **Examples and Demos**:
+   - Created `code_execution_demo.py` with multiple demonstration scenarios
+   - Added `hello_world.py` script for script execution testing
+   - Comprehensive demo covering validation, calculations, data processing, and error handling
+
+### Key Features Working:
+- ✅ Python code execution in controlled environment
+- ✅ Script file execution capabilities  
+- ✅ Code safety validation before execution
+- ✅ Comprehensive error handling (runtime, syntax, security)
+- ✅ Integration with EvoAgentX PythonInterpreterToolkit
+- ✅ Mathematical calculations and data processing
+- ✅ Security restrictions on imports and operations
+- ✅ Status reporting and configuration management
+
+### Verification Standards Met:
+- ✅ **Core Functionality**: ManagerAgent can execute Python code and return results
+- ✅ **Integration**: Seamless integration with EvoAgentX toolkit infrastructure  
+- ✅ **Security**: Proper validation and restricted execution environment
+- ✅ **Testing**: Comprehensive test coverage for all functionality
+- ✅ **Error Handling**: Graceful handling of all error conditions
+
+### Files Created/Modified:
+```
+examples/alita_reproduction/
+├── actions/
+│   ├── __init__.py
+│   └── code_running.py
+├── agents/
+│   └── manager_agent.py (enhanced)
+├── examples/
+│   ├── code_execution_demo.py
+│   └── hello_world.py
+└── tests/
+    ├── test_manager_agent.py (updated)
+    └── test_code_running.py (new)
+```
+
+### Code Quality and Architecture:
+- Clean separation of concerns with dedicated action classes
+- Comprehensive error handling and logging throughout
+- Security-first approach with validation and restrictions
+- Extensive test coverage with multiple scenarios
+- Clear documentation and examples
+- Follows EvoAgentX framework patterns and conventions
+
+This commit successfully adds code execution capabilities to ALITA, enabling the Manager Agent to execute Python code safely and effectively. The foundation is now ready for more advanced tool creation and multi-agent coordination in future commits.
