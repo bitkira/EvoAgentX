@@ -50,9 +50,11 @@ class TestManagerAgent(unittest.TestCase):
         self.assertIn("response_generation", capabilities)
         self.assertIn("task_history", capabilities)
         self.assertIn("capability_assessment", capabilities)
-        # Test new code execution capabilities
+        # Test new code execution and web search capabilities
         self.assertIn("code_execution", capabilities)
         self.assertIn("script_execution", capabilities)
+        self.assertIn("web_search", capabilities)
+        self.assertIn("information_retrieval", capabilities)
     
     def test_assess_tool_needs(self):
         """Test tool needs assessment functionality."""
@@ -230,6 +232,62 @@ print(f"Sum of {numbers}: {sum(numbers)}")
             self.assertIn("Square root of 25: 5", output)
             self.assertIn("Factorial of 5: 120", output)
             self.assertIn("Sum of [1, 2, 3, 4, 5]: 15", output)
+    
+    def test_web_search_capability(self):
+        """Test web search functionality."""
+        manager = ManagerAgent(llm_config=self.llm_config)
+        
+        # Test web search status
+        status = manager.get_web_search_status()
+        self.assertIsInstance(status, dict)
+        
+        # Test search functionality (structure only, not actual results)
+        query = "artificial intelligence"
+        
+        # Test unified search
+        search_result = manager.search_web(query)
+        self.assertIsInstance(search_result, dict)
+        self.assertIn("success", search_result)
+        self.assertIn("query", search_result)
+        
+        # Test Wikipedia search
+        wiki_result = manager.search_wikipedia(query)
+        self.assertIsInstance(wiki_result, dict)
+        self.assertIn("success", wiki_result)
+        self.assertIn("source", wiki_result)
+        if wiki_result["success"]:
+            self.assertEqual(wiki_result["source"], "wikipedia")
+        
+        # Test Google search
+        google_result = manager.search_google(query)
+        self.assertIsInstance(google_result, dict)
+        self.assertIn("success", google_result)
+        self.assertIn("source", google_result)
+        if google_result["success"]:
+            self.assertEqual(google_result["source"], "google")
+    
+    def test_enhanced_task_assessment(self):
+        """Test enhanced task assessment with web search detection."""
+        manager = ManagerAgent(llm_config=self.llm_config)
+        
+        # Test search-related tasks
+        search_tasks = [
+            "search for latest AI research",
+            "find information about quantum computing",
+            "what is machine learning?",
+            "lookup current technology trends"
+        ]
+        
+        for task in search_tasks:
+            assessment = manager.assess_tool_needs(task)
+            self.assertTrue(assessment["needs_additional_tools"])
+            self.assertIn("web_search", assessment["suggested_tools"])
+        
+        # Test non-search tasks still work
+        code_task = "calculate the factorial of 10"
+        assessment = manager.assess_tool_needs(code_task)
+        self.assertTrue(assessment["needs_additional_tools"])
+        self.assertIn("code_execution", assessment["suggested_tools"])
 
 
 class TestALITAConfig(unittest.TestCase):

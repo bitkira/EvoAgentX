@@ -15,6 +15,8 @@ from evoagentx.agents import CustomizeAgent
 from evoagentx.models import OpenAILLMConfig
 from evoagentx.core.message import Message
 from ..actions.code_running import CodeRunningAction
+from ..actions.web_search import WebSearchAction
+from ..actions.file_operations import FileOperationsAction
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -76,11 +78,13 @@ Please analyze this task and provide your response:"""
         self.current_task: Optional[str] = None
         self.iteration_count: int = 0
         
-        # Initialize code running action for tool capabilities
+        # Initialize action capabilities
         self.code_runner = CodeRunningAction()
+        self.web_searcher = WebSearchAction()
+        self.file_handler = FileOperationsAction()
         
         logger.info(f"Manager Agent '{name}' initialized successfully")
-        logger.info("Code execution capabilities enabled")
+        logger.info("Code execution, web search, and file operations capabilities enabled")
     
     def process_task(self, task: str, context: Optional[Dict[str, Any]] = None) -> str:
         """
@@ -139,7 +143,11 @@ Please analyze this task and provide your response:"""
             "task_history": "Track and learn from previous tasks",
             "capability_assessment": "Assess whether additional tools are needed",
             "code_execution": "Execute Python code safely in controlled environment",
-            "script_execution": "Run Python script files with security restrictions"
+            "script_execution": "Run Python script files with security restrictions",
+            "web_search": "Search web sources (Wikipedia, Google) for information",
+            "information_retrieval": "Retrieve and process information from multiple sources",
+            "file_operations": "Read, write, append, and manage files and directories",
+            "file_management": "List files, get file info, and handle different file formats"
         }
     
     def get_task_history(self) -> List[Dict[str, Any]]:
@@ -164,15 +172,17 @@ Please analyze this task and provide your response:"""
         Returns:
             Assessment results including whether new tools are needed
         """
-        # Simple heuristic-based assessment (will be enhanced with LLM reasoning later)
+        # Enhanced heuristic-based assessment for web search and other tools
         needs_web_search = any(keyword in task.lower() for keyword in 
-                              ["search", "find", "lookup", "research", "latest", "current"])
+                              ["search", "find", "lookup", "research", "latest", "current", 
+                               "information about", "what is", "who is", "news", "trends"])
         
         needs_code_execution = any(keyword in task.lower() for keyword in
-                                  ["code", "program", "script", "calculate", "compute", "run"])
+                                  ["code", "program", "script", "calculate", "compute", "run",
+                                   "algorithm", "function", "class", "python"])
         
         needs_file_operations = any(keyword in task.lower() for keyword in
-                                   ["file", "read", "write", "save", "load", "document"])
+                                   ["file", "read", "write", "save", "load", "document", "csv", "json"])
         
         assessment = {
             "needs_additional_tools": needs_web_search or needs_code_execution or needs_file_operations,
@@ -295,4 +305,302 @@ Please analyze this task and provide your response:"""
             return self.code_runner.get_interpreter_status()
         except Exception as e:
             logger.error(f"Error getting code runner status: {str(e)}")
+            return {"error": str(e)}
+    
+    def search_web(self, query: str, source: str = "auto") -> Dict[str, Any]:
+        """
+        Search the web for information using the integrated web search action.
+        
+        Args:
+            query: Search query string
+            source: Search source ('auto', 'wikipedia', 'google', 'all')
+            
+        Returns:
+            Dict containing search results and metadata
+        """
+        logger.info(f"Searching web via Manager Agent: {query}")
+        
+        try:
+            result = self.web_searcher.search(query, source)
+            
+            # Log the search result
+            if result["success"]:
+                total_results = result.get("total_results", len(result.get("results", [])))
+                logger.info(f"Web search successful: {total_results} results found")
+            else:
+                logger.warning(f"Web search failed: {result.get('error', 'Unknown error')}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in web search: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "query": query,
+                "results": [],
+                "error": error_msg
+            }
+    
+    def search_wikipedia(self, query: str) -> Dict[str, Any]:
+        """
+        Search Wikipedia specifically.
+        
+        Args:
+            query: Search query string
+            
+        Returns:
+            Dict containing Wikipedia search results
+        """
+        logger.info(f"Searching Wikipedia via Manager Agent: {query}")
+        
+        try:
+            result = self.web_searcher.search_wikipedia(query)
+            
+            if result["success"]:
+                logger.info(f"Wikipedia search successful: {len(result['results'])} results found")
+            else:
+                logger.warning(f"Wikipedia search failed: {result['error']}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in Wikipedia search: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "source": "wikipedia",
+                "query": query,
+                "results": [],
+                "error": error_msg
+            }
+    
+    def search_google(self, query: str) -> Dict[str, Any]:
+        """
+        Search Google specifically using free search.
+        
+        Args:
+            query: Search query string
+            
+        Returns:
+            Dict containing Google search results
+        """
+        logger.info(f"Searching Google via Manager Agent: {query}")
+        
+        try:
+            result = self.web_searcher.search_google(query)
+            
+            if result["success"]:
+                logger.info(f"Google search successful: {len(result['results'])} results found")
+            else:
+                logger.warning(f"Google search failed: {result['error']}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in Google search: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "source": "google",
+                "query": query,
+                "results": [],
+                "error": error_msg
+            }
+    
+    def get_web_search_status(self) -> Dict[str, Any]:
+        """
+        Get status of web search capabilities.
+        
+        Returns:
+            Dict containing web search status information
+        """
+        try:
+            return self.web_searcher.get_search_status()
+        except Exception as e:
+            logger.error(f"Error getting web search status: {str(e)}")
+            return {"error": str(e)}
+    
+    def read_file(self, file_path: str) -> Dict[str, Any]:
+        """
+        Read content from a file using the integrated file operations action.
+        
+        Args:
+            file_path: Path to the file to read
+            
+        Returns:
+            Dict containing file content and metadata
+        """
+        logger.info(f"Reading file via Manager Agent: {file_path}")
+        
+        try:
+            result = self.file_handler.read_file(file_path)
+            
+            # Log the operation result
+            if result["success"]:
+                logger.info(f"File read successful: {result.get('file_size', 0)} bytes")
+            else:
+                logger.warning(f"File read failed: {result['error']}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in file read: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "operation": "read",
+                "file_path": file_path,
+                "content": None,
+                "error": error_msg
+            }
+    
+    def write_file(self, file_path: str, content: str, overwrite: bool = True) -> Dict[str, Any]:
+        """
+        Write content to a file using the integrated file operations action.
+        
+        Args:
+            file_path: Path to the file to write
+            content: Content to write to the file
+            overwrite: Whether to overwrite existing files
+            
+        Returns:
+            Dict containing operation result and metadata
+        """
+        logger.info(f"Writing file via Manager Agent: {file_path}")
+        
+        try:
+            result = self.file_handler.write_file(file_path, content, overwrite)
+            
+            # Log the operation result
+            if result["success"]:
+                logger.info(f"File write successful: {result.get('content_length', 0)} bytes written")
+            else:
+                logger.warning(f"File write failed: {result['error']}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in file write: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "operation": "write",
+                "file_path": file_path,
+                "error": error_msg
+            }
+    
+    def append_file(self, file_path: str, content: str) -> Dict[str, Any]:
+        """
+        Append content to a file using the integrated file operations action.
+        
+        Args:
+            file_path: Path to the file to append to
+            content: Content to append to the file
+            
+        Returns:
+            Dict containing operation result and metadata
+        """
+        logger.info(f"Appending to file via Manager Agent: {file_path}")
+        
+        try:
+            result = self.file_handler.append_file(file_path, content)
+            
+            # Log the operation result
+            if result["success"]:
+                logger.info(f"File append successful: {result.get('content_length', 0)} bytes appended")
+            else:
+                logger.warning(f"File append failed: {result['error']}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in file append: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "operation": "append",
+                "file_path": file_path,
+                "error": error_msg
+            }
+    
+    def list_files(self, directory_path: str, pattern: Optional[str] = None) -> Dict[str, Any]:
+        """
+        List files in a directory using the integrated file operations action.
+        
+        Args:
+            directory_path: Path to the directory to list
+            pattern: Optional pattern to match files (e.g., "*.py", "*.txt")
+            
+        Returns:
+            Dict containing list of files and metadata
+        """
+        logger.info(f"Listing files via Manager Agent: {directory_path}")
+        
+        try:
+            result = self.file_handler.list_files(directory_path, pattern)
+            
+            # Log the operation result
+            if result["success"]:
+                logger.info(f"File listing successful: {result.get('total_files', 0)} files found")
+            else:
+                logger.warning(f"File listing failed: {result['error']}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in file listing: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "operation": "list",
+                "directory_path": directory_path,
+                "files": [],
+                "error": error_msg
+            }
+    
+    def get_file_info(self, file_path: str) -> Dict[str, Any]:
+        """
+        Get file information using the integrated file operations action.
+        
+        Args:
+            file_path: Path to the file
+            
+        Returns:
+            Dict containing file information
+        """
+        logger.info(f"Getting file info via Manager Agent: {file_path}")
+        
+        try:
+            result = self.file_handler.get_file_info(file_path)
+            
+            # Log the operation result
+            if result["success"]:
+                logger.info(f"File info retrieval successful: {result.get('size', 0)} bytes")
+            else:
+                logger.warning(f"File info retrieval failed: {result['error']}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error getting file info: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "operation": "info",
+                "file_path": file_path,
+                "error": error_msg
+            }
+    
+    def get_file_operations_status(self) -> Dict[str, Any]:
+        """
+        Get status of file operations capabilities.
+        
+        Returns:
+            Dict containing file operations status information
+        """
+        try:
+            return self.file_handler.get_operations_status()
+        except Exception as e:
+            logger.error(f"Error getting file operations status: {str(e)}")
             return {"error": str(e)}
