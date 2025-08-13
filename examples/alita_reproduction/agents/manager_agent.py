@@ -19,6 +19,7 @@ from examples.alita_reproduction.actions.web_search import WebSearchAction
 from examples.alita_reproduction.actions.file_operations import FileOperationsAction
 from examples.alita_reproduction.actions.script_generating import ScriptGeneratingAction
 from examples.alita_reproduction.actions.docker_execution import DockerExecutionAction, DockerConfig
+from examples.alita_reproduction.actions.mcp_integration import MCPIntegrationAction
 from examples.alita_reproduction.utils.security_validator import SecurityValidator, quick_security_check
 from examples.alita_reproduction.utils.docker_config import DockerConfigManager, get_config_for_script_type
 from examples.alita_reproduction.utils.result_validator import ResultValidator, quick_validate_result
@@ -94,6 +95,10 @@ Please analyze this task and provide your response:"""
         self.file_handler = FileOperationsAction()
         self.script_generator = ScriptGeneratingAction()
         
+        # Initialize MCP integration (Commit 7)
+        self.mcp_integration = MCPIntegrationAction()
+        self.mcp_initialized = False
+        
         # Initialize Docker execution capabilities (Commit 6)
         self.docker_config_manager = DockerConfigManager()
         self.security_validator = SecurityValidator()
@@ -105,7 +110,7 @@ Please analyze this task and provide your response:"""
         self._execution_monitor = None
         
         logger.info(f"Manager Agent '{name}' initialized successfully")
-        logger.info("Code execution, web search, file operations, script generation, and Docker security execution capabilities enabled")
+        logger.info("Code execution, web search, file operations, script generation, Docker security execution, and MCP integration capabilities enabled")
     
     def process_task(self, task: str, context: Optional[Dict[str, Any]] = None) -> str:
         """
@@ -175,7 +180,11 @@ Please analyze this task and provide your response:"""
             "security_validation": "Validate code security before execution",
             "result_validation": "Validate and analyze script execution results",
             "error_recovery": "Automatically recover from execution errors",
-            "execution_monitoring": "Monitor resource usage and performance during execution"
+            "execution_monitoring": "Monitor resource usage and performance during execution",
+            "mcp_tool_discovery": "Discover and manage MCP tools dynamically",
+            "mcp_tool_execution": "Execute MCP tools from various sources",
+            "script_to_tool_conversion": "Convert generated scripts to reusable MCP tools",
+            "mcp_persistence": "Persist and manage MCP tool lifecycle"
         }
     
     def get_task_history(self) -> List[Dict[str, Any]]:
@@ -1167,3 +1176,347 @@ Please analyze this task and provide your response:"""
         except Exception as e:
             logger.error(f"Error getting Docker statistics: {str(e)}")
             return {"error": str(e)}
+    
+    # MCP Integration Methods (Commit 7)
+    
+    def _ensure_mcp_initialized(self) -> bool:
+        """Ensure MCP connections are initialized."""
+        try:
+            if not self.mcp_initialized:
+                result = self.mcp_integration.initialize_external_mcp_connection()
+                self.mcp_initialized = result["success"]
+                if self.mcp_initialized:
+                    logger.info("MCP integration initialized successfully")
+                else:
+                    logger.warning(f"MCP initialization failed: {result.get('error', 'Unknown error')}")
+            return self.mcp_initialized
+        except Exception as e:
+            logger.error(f"Error initializing MCP: {str(e)}")
+            return False
+    
+    def discover_mcp_tools(self) -> Dict[str, Any]:
+        """
+        Discover all available MCP tools.
+        
+        Returns:
+            Dictionary containing discovered MCP tools
+        """
+        logger.info("Discovering MCP tools via Manager Agent")
+        
+        try:
+            self._ensure_mcp_initialized()
+            result = self.mcp_integration.discover_available_tools()
+            
+            total_tools = result.get("total_tools", 0)
+            logger.info(f"Discovered {total_tools} MCP tools")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error discovering MCP tools: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "alita_tools": {"tools_count": 0, "tools": {}},
+                "external_tools": [],
+                "total_tools": 0,
+                "error": error_msg
+            }
+    
+    def find_suitable_mcp_tool(self, task_description: str) -> Dict[str, Any]:
+        """
+        Find suitable MCP tools for a task.
+        
+        Args:
+            task_description: Description of the task
+            
+        Returns:
+            Dictionary containing suitable tools and recommendations
+        """
+        logger.info(f"Finding suitable MCP tools for task: {task_description[:100]}...")
+        
+        try:
+            self._ensure_mcp_initialized()
+            result = self.mcp_integration.find_suitable_tool(task_description)
+            
+            suitable_count = len(result.get("suitable_tools", []))
+            logger.info(f"Found {suitable_count} suitable MCP tools")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error finding suitable MCP tools: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "suitable_tools": [],
+                "total_matches": 0,
+                "recommendation": "Error occurred during tool search",
+                "needs_new_tool": True,
+                "error": error_msg
+            }
+    
+    def execute_mcp_tool(
+        self,
+        tool_name: str,
+        tool_args: Optional[Dict[str, Any]] = None,
+        source: str = "auto"
+    ) -> Dict[str, Any]:
+        """
+        Execute an MCP tool by name.
+        
+        Args:
+            tool_name: Name of the tool to execute
+            tool_args: Arguments to pass to the tool
+            source: Tool source ("alita", "external", "auto")
+            
+        Returns:
+            Tool execution result
+        """
+        logger.info(f"Executing MCP tool via Manager Agent: {tool_name}")
+        
+        try:
+            self._ensure_mcp_initialized()
+            result = self.mcp_integration.execute_mcp_tool(tool_name, tool_args, source)
+            
+            if result["success"]:
+                logger.info(f"MCP tool execution successful: {tool_name}")
+            else:
+                logger.warning(f"MCP tool execution failed: {result.get('error', 'Unknown error')}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error executing MCP tool {tool_name}: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "tool_name": tool_name
+            }
+    
+    def register_script_as_mcp_tool(
+        self,
+        script_path: str,
+        tool_name: Optional[str] = None,
+        tool_description: Optional[str] = None,
+        auto_register: bool = None
+    ) -> Dict[str, Any]:
+        """
+        Register a generated script as an MCP tool.
+        
+        Args:
+            script_path: Path to the script to register
+            tool_name: Custom tool name
+            tool_description: Custom tool description
+            auto_register: Whether to auto-register (uses config if None)
+            
+        Returns:
+            Registration result dictionary
+        """
+        logger.info(f"Registering script as MCP tool via Manager Agent: {script_path}")
+        
+        try:
+            # Check auto-registration setting
+            if auto_register is None:
+                auto_register = self.mcp_integration.config_manager.get_setting(
+                    "auto_register_generated_scripts", True
+                )
+            
+            if not auto_register:
+                return {
+                    "success": False,
+                    "error": "Auto-registration is disabled",
+                    "script_path": script_path
+                }
+            
+            self._ensure_mcp_initialized()
+            result = self.mcp_integration.register_script_as_mcp_tool(
+                script_path, tool_name, tool_description
+            )
+            
+            if result["success"]:
+                logger.info(f"Script registered as MCP tool: {result['tool_name']}")
+            else:
+                logger.warning(f"Script registration failed: {result.get('error', 'Unknown error')}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error registering script as MCP tool: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "script_path": script_path
+            }
+    
+    def get_mcp_status(self) -> Dict[str, Any]:
+        """
+        Get MCP integration status.
+        
+        Returns:
+            Dictionary containing MCP status information
+        """
+        logger.info("Getting MCP status via Manager Agent")
+        
+        try:
+            return self.mcp_integration.get_mcp_status()
+        except Exception as e:
+            error_msg = f"Error getting MCP status: {str(e)}"
+            logger.error(error_msg)
+            return {"error": error_msg}
+    
+    def process_task_with_mcp_workflow(self, task: str, context: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Process a task using the enhanced MCP workflow.
+        
+        This method implements the new workflow:
+        Task -> Query MCP Tools -> Use Existing OR Generate New -> Register -> Execute
+        
+        Args:
+            task: Task description
+            context: Optional context information
+            
+        Returns:
+            Enhanced task processing result
+        """
+        logger.info(f"Processing task with MCP workflow: {task[:100]}...")
+        
+        try:
+            # Step 1: Find suitable existing MCP tools
+            tool_search = self.find_suitable_mcp_tool(task)
+            
+            # Step 2: Try to use existing tools first
+            if not tool_search.get("needs_new_tool", True) and tool_search.get("suitable_tools"):
+                best_tool = tool_search["suitable_tools"][0]
+                logger.info(f"Found suitable existing tool: {best_tool['name']}")
+                
+                # Attempt to use the existing tool
+                tool_result = self.execute_mcp_tool(best_tool["name"], {"input": task})
+                
+                if tool_result["success"]:
+                    return f"Task completed using existing MCP tool '{best_tool['name']}':\n{tool_result.get('result', tool_result.get('output', 'Success'))}"
+                else:
+                    logger.warning(f"Existing tool failed, falling back to generation: {tool_result.get('error')}")
+            
+            # Step 3: No suitable tool found, generate new script
+            logger.info("No suitable existing tools found, generating new script")
+            
+            # Determine script type based on task
+            script_type = self._infer_script_type(task)
+            script_name = self._generate_script_name(task)
+            
+            # Generate script
+            generation_result = self.create_script_from_requirements(
+                script_name=script_name,
+                task_description=task,
+                script_type=script_type
+            )
+            
+            if not generation_result["success"]:
+                return f"Failed to generate script for task: {generation_result.get('error')}"
+            
+            script_path = generation_result["script_path"]
+            logger.info(f"Generated script: {script_path}")
+            
+            # Step 4: Register script as MCP tool for future use
+            registration_result = self.register_script_as_mcp_tool(
+                script_path=script_path,
+                tool_name=script_name,
+                tool_description=f"Generated tool for: {task[:100]}"
+            )
+            
+            if registration_result["success"]:
+                logger.info(f"Script registered as MCP tool: {registration_result['tool_name']}")
+            else:
+                logger.warning(f"Script registration failed: {registration_result.get('error')}")
+            
+            # Step 5: Execute the generated script
+            execution_result = self.execute_generated_script_securely(
+                script_path=script_path,
+                script_type=script_type
+            )
+            
+            # Format response
+            response_parts = [
+                f"Task processed using generated script '{script_name}':",
+                f"Script Location: {script_path}"
+            ]
+            
+            if registration_result["success"]:
+                response_parts.append(f"✓ Registered as MCP tool for future use")
+            
+            if execution_result["success"]:
+                response_parts.append(f"✓ Execution successful")
+                if execution_result.get("output"):
+                    response_parts.append(f"Output:\n{execution_result['output']}")
+            else:
+                response_parts.append(f"✗ Execution failed: {execution_result.get('error')}")
+            
+            return "\n".join(response_parts)
+            
+        except Exception as e:
+            error_msg = f"Error in MCP workflow processing: {str(e)}"
+            logger.error(error_msg)
+            return f"Task processing failed: {error_msg}"
+    
+    def _infer_script_type(self, task: str) -> str:
+        """Infer script type from task description."""
+        task_lower = task.lower()
+        
+        if any(keyword in task_lower for keyword in ["data", "csv", "json", "process", "analyze"]):
+            return "data_processing"
+        elif any(keyword in task_lower for keyword in ["web", "scrape", "crawl", "download", "fetch"]):
+            return "web_scraping"
+        elif any(keyword in task_lower for keyword in ["api", "request", "client", "service"]):
+            return "api_client"
+        else:
+            return "general"
+    
+    def _generate_script_name(self, task: str) -> str:
+        """Generate a script name from task description."""
+        import re
+        
+        # Extract key words from task
+        words = re.findall(r'\b[a-zA-Z]+\b', task.lower())
+        key_words = [word for word in words if len(word) > 3 and word not in {
+            'this', 'that', 'with', 'from', 'they', 'were', 'been', 'have', 'will', 'would', 'could', 'should'
+        }][:3]  # Take first 3 meaningful words
+        
+        if key_words:
+            script_name = "_".join(key_words)
+        else:
+            script_name = f"generated_script_{self.iteration_count}"
+        
+        return script_name
+    
+    def cleanup_mcp_tools(self, days: int = 30) -> Dict[str, Any]:
+        """
+        Clean up old, unused MCP tools.
+        
+        Args:
+            days: Remove tools not used in this many days
+            
+        Returns:
+            Cleanup result dictionary
+        """
+        logger.info(f"Cleaning up MCP tools via Manager Agent (older than {days} days)")
+        
+        try:
+            return self.mcp_integration.cleanup_old_tools(days)
+        except Exception as e:
+            error_msg = f"Error cleaning up MCP tools: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "days_threshold": days
+            }
+    
+    def disconnect_mcp(self) -> None:
+        """Disconnect from MCP connections."""
+        try:
+            self.mcp_integration.disconnect_mcp_connections()
+            self.mcp_initialized = False
+            logger.info("MCP connections disconnected")
+        except Exception as e:
+            logger.error(f"Error disconnecting MCP: {str(e)}")

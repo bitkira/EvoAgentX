@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "alita-tools": {
+      "command": "python",
+      "args": [
+        "-m",
+        "examples.alita_reproduction.mcp.alita_mcp_server"
+      ],
+      "env": {
+        "PYTHONPATH": "/Users/bitkira/Documents/GitHub/EvoAgentX"
+      },
+      "timeout": 120.0,
+      "description": "ALITA dynamic tools MCP server"
+    }
+  },
+  "settings": {
+    "auto_register_generated_scripts": true,
+    "backup_scripts_on_registration": true,
+    "cleanup_old_backups_days": 30,
+    "max_concurrent_tools": 50,
+    "tool_execution_timeout": 60
+  },
+  "directories": {
+    "generated_scripts": "generated_scripts",
+    "mcp_persistence": "mcp_persistence",
+    "tools_registry": "mcp/tools_registry.json"
+  }
+}

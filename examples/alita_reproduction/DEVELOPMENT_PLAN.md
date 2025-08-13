@@ -176,30 +176,50 @@
 
 ---
 
-### 🔄 Commit 7: 基于框架的MCP存储系统 (专家建议优化)
+### 🔄 Commit 7: 基于MCP协议的动态工具管理系统 (重大架构调整)
 **状态**: 待开始 🔄  
-**预计时间**: 2-3天
+**预计时间**: 1.5-2天
 
-**实现目标** (基于专家建议优化):
-- [ ] 基于EvoAgentX的StorageHandler实现MCPBox
-- [ ] 工具注册和检索机制
-- [ ] 支持多后端存储 (SQLite/MongoDB)
-- [ ] 工具版本管理和依赖追踪
-- [ ] 工具使用统计和性能监控
-- [ ] 抽象存储接口设计
+**重大发现**: 通过研究EvoAgentX文档，发现MCP = **Model Context Protocol**，EvoAgentX已有完整的MCP支持！
+
+**实现目标** (基于现有MCP框架):
+- [ ] 创建ALITA专用MCP服务器，托管动态生成的工具
+- [ ] 将生成的Python脚本包装为标准MCP工具
+- [ ] 利用EvoAgentX的MCPToolkit实现工具发现和调用
+- [ ] 扩展ManagerAgent工作流程，优先查询MCP工具
+- [ ] 实现工具持久化和元数据管理（基于文件+JSON）
+- [ ] 建立MCP配置文件管理机制
 
 **核心文件**:
-- `storage/mcp_box.py`: MCP存储管理 (基于StorageHandler)
-- `storage/tool_registry.py`: 工具注册表
-- `storage/handlers/abstract.py`: 存储抽象接口
-- `utils/tool_metadata.py`: 工具元数据管理
+- `mcp/alita_mcp_server.py`: ALITA专用MCP服务器实现
+- `mcp/tool_wrapper.py`: 脚本到MCP工具的转换器
+- `mcp/tool_persistence.py`: 工具持久化管理（简化版）
+- `config/mcp_config.json`: MCP服务器配置文件
+- `agents/manager_agent.py`: 集成MCP工具查询逻辑
 
-**架构变更说明**:
-- **框架集成**: 基于EvoAgentX StorageHandler而非文件系统
-- **可扩展性**: 支持SQLite、MongoDB等多种后端
-- **接口抽象**: 为未来扩展和迁移预留接口
+**架构创新**:
+- **零重复造轮子**: 完全基于EvoAgentX现有的MCPToolkit
+- **标准协议**: 使用Model Context Protocol标准，互操作性强
+- **动态注册**: 运行时将生成的脚本注册为MCP工具
+- **工具复用**: 通过MCP协议实现工具的发现、调用和管理
+- **简化持久化**: 用文件+JSON替代复杂数据库，降低技术复杂度
 
-**验收标准**: 成功的工具能被持久化存储和高效检索
+**工作流程重设计**:
+```
+任务接收 → 查询MCP工具库 → 决策分支
+              ↓
+      找到合适工具 ←→ 无合适工具  
+         ↓              ↓
+   通过MCP协议调用    生成新脚本
+         ↓              ↓
+        执行 ← ← 包装为MCP工具并注册
+```
+
+**验收标准**: 
+- 生成的脚本能自动注册为MCP工具
+- ManagerAgent能通过MCP协议发现和调用工具
+- 工具能在重启后持久保存和恢复
+- 与EvoAgentX的Agent系统完美集成
 
 ---
 
