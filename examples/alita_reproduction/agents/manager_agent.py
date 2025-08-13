@@ -17,6 +17,7 @@ from evoagentx.core.message import Message
 from examples.alita_reproduction.actions.code_running import CodeRunningAction
 from examples.alita_reproduction.actions.web_search import WebSearchAction
 from examples.alita_reproduction.actions.file_operations import FileOperationsAction
+from examples.alita_reproduction.actions.script_generating import ScriptGeneratingAction
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -85,9 +86,10 @@ Please analyze this task and provide your response:"""
         self.code_runner = CodeRunningAction()
         self.web_searcher = WebSearchAction()
         self.file_handler = FileOperationsAction()
+        self.script_generator = ScriptGeneratingAction()
         
         logger.info(f"Manager Agent '{name}' initialized successfully")
-        logger.info("Code execution, web search, and file operations capabilities enabled")
+        logger.info("Code execution, web search, file operations, and script generation capabilities enabled")
     
     def process_task(self, task: str, context: Optional[Dict[str, Any]] = None) -> str:
         """
@@ -150,7 +152,9 @@ Please analyze this task and provide your response:"""
             "web_search": "Search web sources (Wikipedia, Google) for information",
             "information_retrieval": "Retrieve and process information from multiple sources",
             "file_operations": "Read, write, append, and manage files and directories",
-            "file_management": "List files, get file info, and handle different file formats"
+            "file_management": "List files, get file info, and handle different file formats",
+            "script_generation": "Generate Python scripts from templates and requirements",
+            "template_management": "Manage and utilize code templates for script generation"
         }
     
     def get_task_history(self) -> List[Dict[str, Any]]:
@@ -187,8 +191,12 @@ Please analyze this task and provide your response:"""
         needs_file_operations = any(keyword in task.lower() for keyword in
                                    ["file", "read", "write", "save", "load", "document", "csv", "json"])
         
+        needs_script_generation = any(keyword in task.lower() for keyword in
+                                     ["generate", "create script", "build script", "write script", 
+                                      "template", "automation", "script for", "generate code"])
+        
         assessment = {
-            "needs_additional_tools": needs_web_search or needs_code_execution or needs_file_operations,
+            "needs_additional_tools": needs_web_search or needs_code_execution or needs_file_operations or needs_script_generation,
             "suggested_tools": [],
             "confidence": 0.7  # Simple heuristic confidence
         }
@@ -199,6 +207,8 @@ Please analyze this task and provide your response:"""
             assessment["suggested_tools"].append("code_execution")
         if needs_file_operations:
             assessment["suggested_tools"].append("file_operations")
+        if needs_script_generation:
+            assessment["suggested_tools"].append("script_generation")
             
         return assessment
     
@@ -606,4 +616,165 @@ Please analyze this task and provide your response:"""
             return self.file_handler.get_operations_status()
         except Exception as e:
             logger.error(f"Error getting file operations status: {str(e)}")
+            return {"error": str(e)}
+    
+    def generate_script_from_template(
+        self,
+        template_name: str,
+        script_name: str,
+        requirements: Dict[str, Any],
+        output_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate a script from a template using the integrated script generation action.
+        
+        Args:
+            template_name: Name of the template to use
+            script_name: Name for the generated script
+            requirements: Dictionary containing template variable values
+            output_path: Custom output path (optional)
+            
+        Returns:
+            Dict containing generation result and metadata
+        """
+        logger.info(f"Generating script via Manager Agent: {script_name} from {template_name}")
+        
+        try:
+            result = self.script_generator.generate_script(
+                template_name, script_name, requirements, output_path
+            )
+            
+            # Log the operation result
+            if result["success"]:
+                logger.info(f"Script generation successful: {result['script_path']}")
+            else:
+                logger.warning(f"Script generation failed: {result['error']}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in script generation: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "script_name": script_name,
+                "template_used": template_name
+            }
+    
+    def create_script_from_requirements(
+        self,
+        script_name: str,
+        task_description: str,
+        script_type: str = "general",
+        additional_requirements: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Create a script based on task description and requirements without using templates.
+        
+        Args:
+            script_name: Name for the generated script
+            task_description: Description of what the script should do
+            script_type: Type of script (data_processing, web_scraping, automation, etc.)
+            additional_requirements: Additional requirements dictionary
+            
+        Returns:
+            Dict containing generation result
+        """
+        logger.info(f"Creating script from requirements via Manager Agent: {script_name}")
+        
+        try:
+            result = self.script_generator.create_script_from_requirements(
+                script_name, task_description, script_type, additional_requirements
+            )
+            
+            # Log the operation result
+            if result["success"]:
+                logger.info(f"Script creation successful: {result['script_path']}")
+            else:
+                logger.warning(f"Script creation failed: {result['error']}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in script creation: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "script_name": script_name
+            }
+    
+    def get_available_templates(self) -> Dict[str, Any]:
+        """
+        Get information about all available script templates.
+        
+        Returns:
+            Dictionary containing template information
+        """
+        logger.info("Getting available templates via Manager Agent")
+        
+        try:
+            result = self.script_generator.get_available_templates()
+            logger.info(f"Retrieved {result['total_templates']} available templates")
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error getting available templates: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "total_templates": 0,
+                "templates": {},
+                "error": error_msg
+            }
+    
+    def validate_generated_script(self, script_path: str) -> Dict[str, Any]:
+        """
+        Validate the syntax and quality of a generated script.
+        
+        Args:
+            script_path: Path to the script file to validate
+            
+        Returns:
+            Dictionary containing validation results
+        """
+        logger.info(f"Validating generated script via Manager Agent: {script_path}")
+        
+        try:
+            result = self.script_generator.validate_script_syntax(script_path)
+            
+            # Log the validation result
+            if result["is_valid"]:
+                logger.info("Script validation successful")
+            else:
+                logger.warning(f"Script validation failed: {result['error']}")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in script validation: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "is_valid": False,
+                "error": error_msg,
+                "script_path": script_path
+            }
+    
+    def get_script_generation_status(self) -> Dict[str, Any]:
+        """
+        Get status of script generation capabilities.
+        
+        Returns:
+            Dict containing script generation status information
+        """
+        try:
+            templates_info = self.script_generator.get_available_templates()
+            return {
+                "available_templates": templates_info['total_templates'],
+                "templates_directory": templates_info['templates_directory'],
+                "output_directory": str(self.script_generator.output_dir),
+                "default_author": self.script_generator.default_author
+            }
+        except Exception as e:
+            logger.error(f"Error getting script generation status: {str(e)}")
             return {"error": str(e)}
