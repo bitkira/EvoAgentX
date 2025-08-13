@@ -12,7 +12,7 @@ import logging
 # Add the parent directory to sys.path to import from alita_reproduction
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from agents.manager_agent import ManagerAgent
+from examples.alita_reproduction.agents.manager_agent import ManagerAgent
 from evoagentx.models import OpenAILLMConfig
 
 # Set up logging

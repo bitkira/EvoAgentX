@@ -14,9 +14,9 @@ from typing import Dict, Any, Optional, List
 from evoagentx.agents import CustomizeAgent
 from evoagentx.models import OpenAILLMConfig
 from evoagentx.core.message import Message
-from ..actions.code_running import CodeRunningAction
-from ..actions.web_search import WebSearchAction
-from ..actions.file_operations import FileOperationsAction
+from examples.alita_reproduction.actions.code_running import CodeRunningAction
+from examples.alita_reproduction.actions.web_search import WebSearchAction
+from examples.alita_reproduction.actions.file_operations import FileOperationsAction
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -70,6 +70,9 @@ Please analyze this task and provide your response:"""
             description=description,
             prompt=manager_prompt,
             llm_config=llm_config,
+            inputs=[
+            {"name": "task", "type": "string", "description": "The task to process"}
+        ],
             **kwargs
         )
         
@@ -104,8 +107,8 @@ Please analyze this task and provide your response:"""
         
         try:
             # Use the parent CustomizeAgent's __call__ method to process the task
-            result = self(task=task)
-            
+            result = self(inputs={"task": task})
+
             # Extract the content from the Message object
             if isinstance(result, Message):
                 response = result.content.content
