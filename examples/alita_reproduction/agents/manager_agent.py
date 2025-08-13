@@ -18,6 +18,12 @@ from examples.alita_reproduction.actions.code_running import CodeRunningAction
 from examples.alita_reproduction.actions.web_search import WebSearchAction
 from examples.alita_reproduction.actions.file_operations import FileOperationsAction
 from examples.alita_reproduction.actions.script_generating import ScriptGeneratingAction
+from examples.alita_reproduction.actions.docker_execution import DockerExecutionAction, DockerConfig
+from examples.alita_reproduction.utils.security_validator import SecurityValidator, quick_security_check
+from examples.alita_reproduction.utils.docker_config import DockerConfigManager, get_config_for_script_type
+from examples.alita_reproduction.utils.result_validator import ResultValidator, quick_validate_result
+from examples.alita_reproduction.utils.error_recovery import ErrorRecoverySystem
+from examples.alita_reproduction.utils.execution_monitor import ExecutionMonitor, MonitoringConfig, MonitoringLevel, ExecutionPhase
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -88,8 +94,18 @@ Please analyze this task and provide your response:"""
         self.file_handler = FileOperationsAction()
         self.script_generator = ScriptGeneratingAction()
         
+        # Initialize Docker execution capabilities (Commit 6)
+        self.docker_config_manager = DockerConfigManager()
+        self.security_validator = SecurityValidator()
+        self.result_validator = ResultValidator()
+        self.error_recovery = ErrorRecoverySystem()
+        
+        # Docker execution will be initialized on-demand to avoid Docker dependency issues
+        self._docker_executor = None
+        self._execution_monitor = None
+        
         logger.info(f"Manager Agent '{name}' initialized successfully")
-        logger.info("Code execution, web search, file operations, and script generation capabilities enabled")
+        logger.info("Code execution, web search, file operations, script generation, and Docker security execution capabilities enabled")
     
     def process_task(self, task: str, context: Optional[Dict[str, Any]] = None) -> str:
         """
@@ -154,7 +170,12 @@ Please analyze this task and provide your response:"""
             "file_operations": "Read, write, append, and manage files and directories",
             "file_management": "List files, get file info, and handle different file formats",
             "script_generation": "Generate Python scripts from templates and requirements",
-            "template_management": "Manage and utilize code templates for script generation"
+            "template_management": "Manage and utilize code templates for script generation",
+            "docker_execution": "Execute code safely in isolated Docker containers",
+            "security_validation": "Validate code security before execution",
+            "result_validation": "Validate and analyze script execution results",
+            "error_recovery": "Automatically recover from execution errors",
+            "execution_monitoring": "Monitor resource usage and performance during execution"
         }
     
     def get_task_history(self) -> List[Dict[str, Any]]:
@@ -777,4 +798,372 @@ Please analyze this task and provide your response:"""
             }
         except Exception as e:
             logger.error(f"Error getting script generation status: {str(e)}")
+            return {"error": str(e)}
+    
+    # Docker Execution Methods (Commit 6)
+    
+    def _ensure_docker_executor(self, script_type: str = "standard") -> bool:
+        """Ensure Docker executor is initialized with appropriate configuration."""
+        try:
+            if self._docker_executor is None:
+                config = get_config_for_script_type(script_type)
+                self._docker_executor = DockerExecutionAction(config)
+                logger.info(f"Docker executor initialized for script type: {script_type}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize Docker executor: {str(e)}")
+            return False
+    
+    def _ensure_execution_monitor(self) -> bool:
+        """Ensure execution monitor is initialized."""
+        try:
+            if self._execution_monitor is None:
+                monitor_config = MonitoringConfig(level=MonitoringLevel.STANDARD)
+                self._execution_monitor = ExecutionMonitor(monitor_config)
+                logger.info("Execution monitor initialized")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize execution monitor: {str(e)}")
+            return False
+    
+    def execute_code_in_docker(
+        self,
+        code: str,
+        script_type: str = "standard",
+        timeout: Optional[int] = None,
+        validate_security: bool = True,
+        monitor_execution: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Execute code in Docker container with security validation and monitoring.
+        
+        Args:
+            code: Code to execute
+            script_type: Type of script for configuration selection
+            timeout: Execution timeout
+            validate_security: Whether to perform security validation
+            monitor_execution: Whether to monitor execution
+            
+        Returns:
+            Dict with execution results and metadata
+        """
+        logger.info(f"Executing code in Docker container (type: {script_type})")
+        
+        execution_id = None
+        
+        try:
+            # Ensure Docker executor is available
+            if not self._ensure_docker_executor(script_type):
+                return {
+                    "success": False,
+                    "error": "Failed to initialize Docker execution environment",
+                    "execution_method": "docker"
+                }
+            
+            # Start monitoring if enabled
+            if monitor_execution:
+                if self._ensure_execution_monitor():
+                    execution_id = self._execution_monitor.start_execution_monitoring(
+                        docker_image=self._docker_executor.config.image_tag,
+                        timeout=timeout or self._docker_executor.config.timeout
+                    )
+                    self._execution_monitor.update_execution_phase(
+                        execution_id, ExecutionPhase.VALIDATION
+                    )
+            
+            # Security validation
+            security_result = None
+            if validate_security:
+                logger.info("Performing security validation...")
+                security_result = quick_security_check(code)
+                
+                if execution_id:
+                    self._execution_monitor.record_security_issues(
+                        execution_id, security_result.get('total_issues', 0)
+                    )
+                
+                if not security_result['is_safe'] and security_result['critical_issues'] > 0:
+                    logger.warning(f"Code failed security validation: {security_result['total_issues']} issues")
+                    if execution_id:
+                        self._execution_monitor.stop_execution_monitoring(execution_id)
+                    return {
+                        "success": False,
+                        "error": "Code failed security validation",
+                        "security_report": security_result,
+                        "execution_method": "docker"
+                    }
+            
+            # Execute in Docker
+            if execution_id:
+                self._execution_monitor.update_execution_phase(
+                    execution_id, ExecutionPhase.CODE_EXECUTION
+                )
+            
+            execution_result = self._docker_executor.execute_code(
+                code, timeout=timeout, validate_security=False  # Already validated above
+            )
+            
+            # Validate results
+            if execution_id:
+                self._execution_monitor.update_execution_phase(
+                    execution_id, ExecutionPhase.RESULT_PROCESSING
+                )
+            
+            validation_result = quick_validate_result(
+                execution_result.output,
+                execution_result.error,
+                execution_result.execution_time,
+                script_type
+            )
+            
+            # Record results
+            if execution_id:
+                self._execution_monitor.record_execution_result(
+                    execution_id,
+                    execution_result.status.value == "success",
+                    len(execution_result.output) if execution_result.output else 0,
+                    execution_result.error
+                )
+                
+                final_metrics = self._execution_monitor.stop_execution_monitoring(execution_id)
+            else:
+                final_metrics = None
+            
+            # Prepare response
+            response = {
+                "success": execution_result.status.value == "success",
+                "output": execution_result.output,
+                "error": execution_result.error,
+                "execution_time": execution_result.execution_time,
+                "execution_method": "docker",
+                "security_issues": len(execution_result.security_issues) if execution_result.security_issues else 0,
+                "validation_result": validation_result
+            }
+            
+            if security_result:
+                response["security_report"] = security_result
+            
+            if final_metrics:
+                response["metrics"] = {
+                    "total_duration": final_metrics.get_total_duration(),
+                    "phase_timings": final_metrics.phase_timings,
+                    "resource_usage": {
+                        "avg_cpu": sum(final_metrics.cpu_usage_percent) / len(final_metrics.cpu_usage_percent) if final_metrics.cpu_usage_percent else 0,
+                        "max_memory_mb": max(final_metrics.memory_usage_mb) if final_metrics.memory_usage_mb else 0
+                    }
+                }
+            
+            logger.info(f"Docker code execution completed: success={response['success']}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error in Docker code execution: {str(e)}"
+            logger.error(error_msg)
+            
+            if execution_id:
+                self._execution_monitor.record_execution_result(execution_id, False, 0, error_msg)
+                self._execution_monitor.stop_execution_monitoring(execution_id)
+            
+            return {
+                "success": False,
+                "error": error_msg,
+                "execution_method": "docker"
+            }
+    
+    def execute_script_in_docker(
+        self,
+        script_path: str,
+        script_type: str = "standard",
+        timeout: Optional[int] = None,
+        validate_security: bool = True,
+        monitor_execution: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Execute script file in Docker container.
+        
+        Args:
+            script_path: Path to script file
+            script_type: Type of script
+            timeout: Execution timeout
+            validate_security: Whether to validate security
+            monitor_execution: Whether to monitor execution
+            
+        Returns:
+            Dict with execution results
+        """
+        logger.info(f"Executing script file in Docker: {script_path}")
+        
+        try:
+            if not self._ensure_docker_executor(script_type):
+                return {
+                    "success": False,
+                    "error": "Failed to initialize Docker execution environment",
+                    "script_path": script_path
+                }
+            
+            execution_result = self._docker_executor.execute_script_file(
+                script_path, timeout=timeout, validate_security=validate_security
+            )
+            
+            # Validate results
+            validation_result = quick_validate_result(
+                execution_result.output,
+                execution_result.error,
+                execution_result.execution_time,
+                script_type
+            )
+            
+            response = {
+                "success": execution_result.status.value == "success",
+                "output": execution_result.output,
+                "error": execution_result.error,
+                "execution_time": execution_result.execution_time,
+                "script_path": script_path,
+                "execution_method": "docker",
+                "security_issues": len(execution_result.security_issues) if execution_result.security_issues else 0,
+                "validation_result": validation_result
+            }
+            
+            logger.info(f"Docker script execution completed: success={response['success']}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error in Docker script execution: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "script_path": script_path,
+                "execution_method": "docker"
+            }
+    
+    def execute_generated_script_securely(
+        self,
+        script_path: str,
+        script_type: str = "standard",
+        timeout: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Execute a generated script with maximum security validation.
+        
+        Args:
+            script_path: Path to generated script
+            script_type: Type of script
+            timeout: Execution timeout
+            
+        Returns:
+            Dict with execution results
+        """
+        logger.info(f"Executing generated script securely: {script_path}")
+        
+        try:
+            if not self._ensure_docker_executor(script_type):
+                return {
+                    "success": False,
+                    "error": "Failed to initialize Docker execution environment",
+                    "script_path": script_path
+                }
+            
+            execution_result = self._docker_executor.execute_generated_script(
+                script_path, timeout=timeout, enhanced_security=True
+            )
+            
+            # Enhanced result validation for generated scripts
+            validation_result = quick_validate_result(
+                execution_result.output,
+                execution_result.error,
+                execution_result.execution_time,
+                script_type
+            )
+            
+            response = {
+                "success": execution_result.status.value == "success",
+                "output": execution_result.output,
+                "error": execution_result.error,
+                "execution_time": execution_result.execution_time,
+                "script_path": script_path,
+                "execution_method": "docker_secure",
+                "security_issues": len(execution_result.security_issues) if execution_result.security_issues else 0,
+                "validation_result": validation_result,
+                "enhanced_security": True
+            }
+            
+            logger.info(f"Secure script execution completed: success={response['success']}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error in secure script execution: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "script_path": script_path,
+                "execution_method": "docker_secure"
+            }
+    
+    def validate_code_security(self, code: str) -> Dict[str, Any]:
+        """
+        Validate code security using the security validator.
+        
+        Args:
+            code: Code to validate
+            
+        Returns:
+            Dict with security validation results
+        """
+        logger.info("Validating code security via Manager Agent")
+        
+        try:
+            return quick_security_check(code)
+        except Exception as e:
+            error_msg = f"Error in security validation: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "is_safe": False,
+                "risk_level": "critical",
+                "total_issues": 1,
+                "critical_issues": 1,
+                "summary": f"Validation failed: {error_msg}"
+            }
+    
+    def validate_docker_environment(self) -> Dict[str, Any]:
+        """
+        Validate Docker execution environment.
+        
+        Returns:
+            Dict with environment validation results
+        """
+        logger.info("Validating Docker environment via Manager Agent")
+        
+        try:
+            if not self._ensure_docker_executor():
+                return {
+                    "valid": False,
+                    "error": "Failed to initialize Docker executor"
+                }
+            
+            return self._docker_executor.validate_execution_environment()
+            
+        except Exception as e:
+            error_msg = f"Error validating Docker environment: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "valid": False,
+                "error": error_msg
+            }
+    
+    def get_docker_execution_statistics(self) -> Dict[str, Any]:
+        """
+        Get Docker execution statistics.
+        
+        Returns:
+            Dict with execution statistics
+        """
+        try:
+            if self._docker_executor:
+                return self._docker_executor.get_execution_statistics()
+            else:
+                return {"total_executions": 0, "message": "Docker executor not initialized"}
+        except Exception as e:
+            logger.error(f"Error getting Docker statistics: {str(e)}")
             return {"error": str(e)}
