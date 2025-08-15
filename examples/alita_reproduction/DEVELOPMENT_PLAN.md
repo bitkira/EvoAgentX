@@ -100,36 +100,34 @@
 
 ## Phase 2: 简化版工具创建 (Commits 5-7)
 
-### ✅ Commit 5: 基础脚本生成
+### ✅ Commit 5: 简化LLM脚本生成 (架构重构)
 **状态**: 已完成 ✅  
-**完成时间**: 2025-08-13
+**完成时间**: 2025-08-15 (重构完成)
 
-**实现目标**:
-- [x] 创建ScriptGeneratingAction
-- [x] 基于模板和规则的脚本生成
-- [x] 简单的代码模板库 (3个模板: data_processing, web_scraping, api_client)
-- [x] 基础的代码质量检查
-- [x] 脚本元数据管理
-- [x] 集成到ManagerAgent
-- [x] 单元测试和示例代码
+**重大架构调整** (基于用户反馈):
+- [x] **移除复杂模板系统**: 删除过度设计的模板变量替换机制
+- [x] **采用LLM直接生成**: 使用CustomizeAgent进行智能代码生成
+- [x] **简化代码质量检查**: 专注安全验证和基础语法检查
+- [x] **保留脚本元数据管理**: 维持生成脚本的追踪和管理
+- [x] **更新测试和示例**: 创建针对新架构的测试用例
 
-**核心文件**:
-- `actions/script_generating.py`: 脚本生成Action
-- `templates/`: 代码模板目录 (3个基础模板)
-- `utils/code_quality.py`: 代码质量检查工具
-- `agents/manager_agent.py`: 增强脚本生成能力
-- `tests/test_script_generating.py`: 脚本生成测试
-- `examples/script_generation_demo.py`: 完整功能演示
-- `examples/simple_script_generation_example.py`: 简单示例
+**核心文件** (重构后):
+- `actions/script_generating.py`: 简化的LLM脚本生成器 (616行)
+- `utils/code_quality.py`: 精简的代码质量检查器 (347行)
+- `agents/manager_agent.py`: 集成LLM脚本生成能力
+- `tests/test_script_generation.py`: 新的综合测试套件
+- `examples/example_usage.py`: 多场景使用演示
+- `examples/quick_start.py`: 快速入门指南
 
-**验收标准**: 能生成简单的可执行Python脚本 ✅
+**验收标准**: 能通过LLM智能生成任意类型的Python脚本 ✅
 
-**功能特性**:
-- 模板系统: 支持变量替换和元数据提取
-- 需求驱动生成: 根据任务描述和脚本类型生成代码
-- 代码质量分析: 语法验证、安全风险检测、代码质量评分
-- ManagerAgent集成: 通过管理员代理统一访问脚本生成功能
-- 多种脚本类型: 数据处理、Web抓取、API客户端等
+**新架构优势**:
+- **智能生成**: 直接使用LLM根据任务描述生成代码，无需预定义模板
+- **更强灵活性**: 可处理任何类型的脚本需求，不受模板限制
+- **自动纠错**: 集成重试机制，自动修复生成的代码问题
+- **简化维护**: 移除模板系统，减少维护复杂度
+- **安全验证**: 保持AST解析和安全检查，确保生成代码安全性
+- **完整集成**: 与EvoAgentX的CustomizeAgent无缝集成
 
 ---
 

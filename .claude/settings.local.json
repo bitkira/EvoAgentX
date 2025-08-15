@@ -5,8 +5,11 @@
       "mcp__deepwiki__read_wiki_contents",
       "mcp__deepwiki__ask_question",
       "Bash(git add:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(claude doctor)",
+      "Bash(python tests:*)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits"
   }
 }
